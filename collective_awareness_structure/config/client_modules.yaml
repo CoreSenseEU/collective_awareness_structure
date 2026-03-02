@@ -1,0 +1,7 @@
+# Module registration list for CA_GatewayClientAfferent.
+
+modules:
+  - type: "perception"
+    module_name: "drone0_perception"
+  - type: "planning"
+    module_name: "drone0_planning"
