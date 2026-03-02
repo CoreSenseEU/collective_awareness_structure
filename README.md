@@ -1,6 +1,6 @@
 # as2_ca
 
-Collective Awareness (CA) package for the [cs4home architecture](https://github.com/CoreSenseEU/cs4home_architecture), providing inter-agent communication infrastructure for multi-robot systems built with [Aerostack2](https://github.com/aerostack2/aerostack2).
+Collective Awareness (CA) package for the [cs4home architecture](https://github.com/CoreSenseEU/cs4home_architecture), providing inter-agent communication infrastructure for multi-robot systems built with [Aerostack2](https://github.com/aerostack2/aerostack2) in the Inspection Testbed.
 
 ## Overview
 
