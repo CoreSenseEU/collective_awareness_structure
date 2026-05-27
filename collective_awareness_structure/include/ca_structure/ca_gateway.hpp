@@ -27,46 +27,56 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_coupling.hpp
- *  \brief      CA_GatewayCoupling component header
+ *  \file       ca_gateway.hpp
+ *  \brief      CA_Gateway node header file
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#ifndef AS2_CA__CA_GATEWAY_COUPLING_HPP_
-#define AS2_CA__CA_GATEWAY_COUPLING_HPP_
+#ifndef CA_STRUCTURE__CA_GATEWAY_HPP_
+#define CA_STRUCTURE__CA_GATEWAY_HPP_
 
 #include <memory>
+#include <string>
 
-#include "as2_ca_msgs/srv/register_module.hpp"
-#include "as2_ca/ca_gateway_efferent.hpp"
+#include "cs4home_core/CognitiveModule.hpp"
 
-#include "cs4home_core/Coupling.hpp"
+#include "ca_msgs/msg/inter_agent_message.hpp"
+#include "ca_msgs/msg/local_generic_message.hpp"
+
+#include "ca_structure/ca_gateway_afferent.hpp"
+#include "ca_structure/ca_gateway_coupling.hpp"
+#include "ca_structure/ca_gateway_core.hpp"
+#include "ca_structure/ca_gateway_efferent.hpp"
+
 #include "rclcpp/rclcpp.hpp"
-#include "rclcpp_lifecycle/lifecycle_node.hpp"
 
-namespace as2_ca
+namespace ca_structure
 {
 
-class CA_GatewayCoupling : public cs4home_core::Coupling
+class CA_Gateway : public cs4home_core::CognitiveModule
 {
 public:
-  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayCoupling)
+  RCLCPP_SMART_PTR_DEFINITIONS(CA_Gateway)
+  using CallbackReturnT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-  CA_GatewayCoupling(
-    rclcpp_lifecycle::LifecycleNode::SharedPtr parent,
-    CA_GatewayEfferent::SharedPtr efferent);
+  CA_Gateway();
 
-  bool configure() override;
+  CallbackReturnT on_configure(const rclcpp_lifecycle::State & state) override;
+
+protected:
+  // Outgoing path: local modules → inter-agent network
+  rclcpp::Subscription<ca_msgs::msg::LocalGenericMessage>::SharedPtr outgoing_ca_sub_;
+  rclcpp::Publisher<ca_msgs::msg::InterAgentMessage>::SharedPtr inter_agent_pub_;
+
+  std::string inter_agent_topic_;
+  std::string register_module_service_name_;
+  std::string out_messages_topic_;
+  std::string agent_id_;
 
 private:
-  void register_module_cb(
-    const std::shared_ptr<as2_ca_msgs::srv::RegisterModule::Request> request,
-    std::shared_ptr<as2_ca_msgs::srv::RegisterModule::Response> response);
-
-  CA_GatewayEfferent::SharedPtr efferent_;
-  rclcpp::Service<as2_ca_msgs::srv::RegisterModule>::SharedPtr register_module_srv_;
+  void forward_local_message(const ca_msgs::msg::LocalGenericMessage::SharedPtr msg);
 };
 
-}  // namespace as2_ca
+}  // namespace ca_structure
 
-#endif  // AS2_CA__CA_GATEWAY_COUPLING_HPP_
+#endif  // CA_STRUCTURE__CA_GATEWAY_HPP_

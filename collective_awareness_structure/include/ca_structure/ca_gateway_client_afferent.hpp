@@ -27,38 +27,46 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_core.hpp
- *  \brief      CA_GatewayCore component header
+ *  \file       ca_gateway_client_afferent.hpp
+ *  \brief      Afferent component that reads module registrations from a YAML
+ *              file and subscribes to the gateway-provided local topics.
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#ifndef AS2_CA__CA_GATEWAY_CORE_HPP_
-#define AS2_CA__CA_GATEWAY_CORE_HPP_
+#ifndef AS2_CA__CA_GATEWAY_CLIENT_AFFERENT_HPP_
+#define AS2_CA__CA_GATEWAY_CLIENT_AFFERENT_HPP_
 
 #include <memory>
+#include <string>
 
-#include "cs4home_core/Core.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "cs4home_core/Afferent.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "ca_msgs/srv/register_module.hpp"
 
-namespace as2_ca
+namespace ca_structure
 {
 
-class CA_GatewayCore : public cs4home_core::Core
+/**
+ * @class CA_GatewayClientAfferent
+ * @brief Afferent that reads {type, module_name} pairs from a YAML file
+ *        (parameter CA_GatewayClientAfferent.config_file), calls the
+ *        register_module service for each entry, and subscribes to the
+ *        returned LocalGenericMessage topics.
+ */
+class CA_GatewayClientAfferent : public cs4home_core::Afferent
 {
 public:
-  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayCore)
+  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayClientAfferent)
 
-  explicit CA_GatewayCore(rclcpp_lifecycle::LifecycleNode::SharedPtr parent);
+  explicit CA_GatewayClientAfferent(rclcpp_lifecycle::LifecycleNode::SharedPtr parent);
 
   bool configure() override;
-  bool activate() override;
-  bool deactivate() override;
 
 private:
-  void ia_message_callback(std::shared_ptr<rclcpp::SerializedMessage> msg);
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
+  rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedPtr register_module_client_;
 };
 
-}  // namespace as2_ca
+}  // namespace ca_structure
 
-#endif  // AS2_CA__CA_GATEWAY_CORE_HPP_
+#endif  // AS2_CA__CA_GATEWAY_CLIENT_AFFERENT_HPP_

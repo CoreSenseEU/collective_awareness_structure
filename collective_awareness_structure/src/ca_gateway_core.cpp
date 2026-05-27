@@ -32,18 +32,18 @@
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "as2_ca/ca_gateway_core.hpp"
-#include "as2_ca/ca_gateway_efferent.hpp"
+#include "ca_structure/ca_gateway_core.hpp"
+#include "ca_structure/ca_gateway_efferent.hpp"
 
 #include <memory>
 #include <string>
 
-#include "as2_ca_msgs/msg/inter_agent_message.hpp"
-#include "as2_ca_msgs/msg/local_generic_message.hpp"
+#include "ca_msgs/msg/inter_agent_message.hpp"
+#include "ca_msgs/msg/local_generic_message.hpp"
 
 using std::placeholders::_1;
 
-namespace as2_ca
+namespace ca_structure
 {
 
 CA_GatewayCore::CA_GatewayCore(rclcpp_lifecycle::LifecycleNode::SharedPtr parent)
@@ -76,7 +76,7 @@ bool CA_GatewayCore::deactivate()
 
 void CA_GatewayCore::ia_message_callback(std::shared_ptr<rclcpp::SerializedMessage> serialized_msg)
 {
-  auto msg = afferent_->get_msg<as2_ca_msgs::msg::InterAgentMessage>(serialized_msg);
+  auto msg = afferent_->get_msg<ca_msgs::msg::InterAgentMessage>(serialized_msg);
 
   auto gw_efferent = std::dynamic_pointer_cast<CA_GatewayEfferent>(efferent_);
   if (!gw_efferent->has_type(msg->type)) {
@@ -89,7 +89,7 @@ void CA_GatewayCore::ia_message_callback(std::shared_ptr<rclcpp::SerializedMessa
 
   size_t idx = gw_efferent->get_index_for_type(msg->type);
 
-  auto local_msg = std::make_shared<as2_ca_msgs::msg::LocalGenericMessage>();
+  auto local_msg = std::make_shared<ca_msgs::msg::LocalGenericMessage>();
   local_msg->agent = msg->sender;
   local_msg->type = msg->type;
   local_msg->data = msg->data;
@@ -103,4 +103,4 @@ void CA_GatewayCore::ia_message_callback(std::shared_ptr<rclcpp::SerializedMessa
     gw_efferent->get_topic_for_index(idx).c_str());
 }
 
-}  // namespace as2_ca
+}  // namespace ca_structure

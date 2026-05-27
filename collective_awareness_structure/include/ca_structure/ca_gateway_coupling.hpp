@@ -27,44 +27,46 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_efferent.hpp
- *  \brief      CA_GatewayEfferent component header
+ *  \file       ca_gateway_coupling.hpp
+ *  \brief      CA_GatewayCoupling component header
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#ifndef AS2_CA__CA_GATEWAY_EFFERENT_HPP_
-#define AS2_CA__CA_GATEWAY_EFFERENT_HPP_
+#ifndef AS2_CA__CA_GATEWAY_COUPLING_HPP_
+#define AS2_CA__CA_GATEWAY_COUPLING_HPP_
 
-#include <string>
-#include <unordered_map>
+#include <memory>
 
-#include "cs4home_core/Efferent.hpp"
+#include "ca_msgs/srv/register_module.hpp"
+#include "ca_structure/ca_gateway_efferent.hpp"
+
+#include "cs4home_core/Coupling.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
-namespace as2_ca
+namespace ca_structure
 {
 
-class CA_GatewayEfferent : public cs4home_core::Efferent
+class CA_GatewayCoupling : public cs4home_core::Coupling
 {
 public:
-  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayEfferent)
+  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayCoupling)
 
-  explicit CA_GatewayEfferent(rclcpp_lifecycle::LifecycleNode::SharedPtr parent);
+  CA_GatewayCoupling(
+    rclcpp_lifecycle::LifecycleNode::SharedPtr parent,
+    CA_GatewayEfferent::SharedPtr efferent);
 
-  bool configure() override;
-
-  // Creates a publisher for the given type on topic "<type>_in" if not already present.
-  // Returns the publisher index for use with publish().
-  size_t add_type_publisher(const std::string & type);
-
-  bool has_type(const std::string & type) const;
-  size_t get_index_for_type(const std::string & type) const;
-  std::string get_topic_for_index(size_t idx) const;
+  bool configure();
 
 private:
-  std::unordered_map<std::string, size_t> type_to_index_;
+  void register_module_cb(
+    const std::shared_ptr<ca_msgs::srv::RegisterModule::Request> request,
+    std::shared_ptr<ca_msgs::srv::RegisterModule::Response> response);
+
+  CA_GatewayEfferent::SharedPtr efferent_;
+  rclcpp::Service<ca_msgs::srv::RegisterModule>::SharedPtr register_module_srv_;
 };
 
-}  // namespace as2_ca
+}  // namespace ca_structure
 
-#endif  // AS2_CA__CA_GATEWAY_EFFERENT_HPP_
+#endif  // AS2_CA__CA_GATEWAY_COUPLING_HPP_

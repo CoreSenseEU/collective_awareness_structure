@@ -36,39 +36,51 @@
 
 #include <gtest/gtest.h>
 #include <thread>
+#include <optional>
 #include <memory>
 #include <string>
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
 #include "std_msgs/msg/string.hpp"
 #include "rclcpp/executor.hpp"
+#include "lifecycle_msgs/msg/transition.hpp"
 
-#include "as2_ca/ca_gateway.hpp"
-#include "as2_ca/ca_gateway_client.hpp"
+#include "ca_structure/ca_gateway.hpp"
+#include "ca_structure/ca_gateway_client.hpp"
 
 class CA_Gateway_ClientTest : public ::testing::Test
 {
 protected:
   CA_Gateway_ClientTest()
-  : executor_(), executor_gateway_(), gateway_node_(std::make_shared<as2_ca::CA_Gateway>()),
+  : executor_(), executor_gateway_(),
+    gateway_node_(std::make_shared<ca_structure::CA_Gateway>()),
     publisher_node(std::make_shared<rclcpp::Node>("test_publisher_node")),
-    listener_node(std::make_shared<rclcpp::Node>("test_listener_node")),
-    client_(listener_node)
+    listener_node(std::make_shared<rclcpp::Node>("test_listener_node"))
   {
-    executor_gateway_.add_node(gateway_node_);
+    // CA_Gateway is a CognitiveModule (LifecycleNode): use get_node_base_interface()
+    executor_gateway_.add_node(gateway_node_->get_node_base_interface());
     executor_.add_node(publisher_node);
     executor_.add_node(listener_node);
+
+    // Configure and activate the gateway synchronously so its service is available
+    // before CAGatewayClient tries to connect to it
+    gateway_node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+    gateway_node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     test_data_ = "test_data";
     test_topic_ = "test_topic";
     test_type_ = "test_type";
 
     local_publisher_ =
-      publisher_node->template create_publisher<as2_ca_msgs::msg::InterAgentMessage>(
+      publisher_node->template create_publisher<ca_msgs::msg::InterAgentMessage>(
       "/agent_to_agent", rclcpp::QoS(10));
 
-    register_client_ = listener_node->template create_client<as2_ca_msgs::srv::RegisterModule>(
+    register_client_ = listener_node->template create_client<ca_msgs::srv::RegisterModule>(
       "/register_module");
+
+    // CAGatewayClient blocks waiting for the register_module service; construct it
+    // only after the gateway has been configured (service is now registered)
+    client_.emplace(listener_node);
 
     received_ = false;
 
@@ -81,17 +93,17 @@ protected:
   rclcpp::executors::MultiThreadedExecutor executor_gateway_;
 
   // CA Gateway node receiving inter agent messages
-  std::shared_ptr<as2_ca::CA_Gateway> gateway_node_;
+  std::shared_ptr<ca_structure::CA_Gateway> gateway_node_;
 
   // Publisher for inter agent messages
   rclcpp::Node::SharedPtr publisher_node;
   // Local module node that registers with the CA Gateway and receives forwarded messages
   rclcpp::Node::SharedPtr listener_node;
 
-  rclcpp::Publisher<as2_ca_msgs::msg::InterAgentMessage>::SharedPtr local_publisher_;
+  rclcpp::Publisher<ca_msgs::msg::InterAgentMessage>::SharedPtr local_publisher_;
 
-  as2_ca::CAGatewayClient client_;
-  rclcpp::Client<as2_ca_msgs::srv::RegisterModule>::SharedPtr register_client_;
+  std::optional<ca_structure::CAGatewayClient> client_;
+  rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedPtr register_client_;
 
   // Test data
   std::string test_data_;
@@ -109,7 +121,7 @@ TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
   std::thread client_thread([this]() {executor_.spin();});
 
   // Register local module in gateway using the GatewayClient
-  client_.register_module<std_msgs::msg::String>(
+  client_->register_module<std_msgs::msg::String>(
     test_type_, "test_module",
     [&](const std_msgs::msg::String & msg, const std::string & agent_id) {
       RCLCPP_INFO(
@@ -120,7 +132,7 @@ TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
       EXPECT_EQ(msg.data, "test_data");
     });
 
-  while (client_.get_subscriber_count() == 0) {
+  while (client_->get_subscriber_count() == 0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
@@ -132,7 +144,7 @@ TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
   serializer.serialize_message(&test_msg, &serialized);
 
   // Publish a message to the InterAgent topic with the correct type and data
-  as2_ca_msgs::msg::InterAgentMessage msg;
+  ca_msgs::msg::InterAgentMessage msg;
   msg.sender = "test_sender";
   msg.receiver = "test_receiver";
   msg.type = test_type_;

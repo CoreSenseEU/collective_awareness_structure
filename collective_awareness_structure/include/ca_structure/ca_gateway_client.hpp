@@ -41,9 +41,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "as2_ca_msgs/msg/local_generic_message.hpp"
-#include "as2_ca_msgs/msg/inter_agent_message.hpp"
-#include "as2_ca_msgs/srv/register_module.hpp"
+#include "ca_msgs/msg/local_generic_message.hpp"
+#include "ca_msgs/msg/inter_agent_message.hpp"
+#include "ca_msgs/srv/register_module.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/serialization.hpp"
@@ -52,7 +52,7 @@
 
 using std::placeholders::_1;
 
-namespace as2_ca
+namespace ca_structure
 {
 class CAGatewayClient
 {
@@ -71,7 +71,7 @@ public:
     auto logger = parent_->get_logger();
     try {
       // Create a request for the register_module service
-      auto request_msg = std::make_shared<as2_ca_msgs::srv::RegisterModule::Request>();
+      auto request_msg = std::make_shared<ca_msgs::srv::RegisterModule::Request>();
       request_msg->type = type;
       request_msg->module_name = module_name;
 
@@ -91,7 +91,7 @@ public:
       register_module_client_->async_send_request(
         request_msg,
         [this, module_name, callback](
-          rclcpp::Client<as2_ca_msgs::srv::RegisterModule>::SharedFuture future)
+          rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedFuture future)
         {
           auto response = future.get();
           if (response->topic == "") {
@@ -116,10 +116,10 @@ public:
 
 private:
   // Subscriber for local_generic messages
-  std::vector<rclcpp::Subscription<as2_ca_msgs::msg::LocalGenericMessage>::SharedPtr>
+  std::vector<rclcpp::Subscription<ca_msgs::msg::LocalGenericMessage>::SharedPtr>
   local_generic_subscribers_;
 
-  rclcpp::Client<as2_ca_msgs::srv::RegisterModule>::SharedPtr register_module_client_;
+  rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedPtr register_module_client_;
 
   std::string agent_id_;
 
@@ -129,9 +129,9 @@ private:
     const std::string &)> callback)
   {
     // Create a subscription to the local generic topic
-    auto subscription = parent_->create_subscription<as2_ca_msgs::msg::LocalGenericMessage>(
+    auto subscription = parent_->create_subscription<ca_msgs::msg::LocalGenericMessage>(
       generic_topic_name, 10, [callback](
-        const as2_ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
+        const ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
         T deserialized_msg;
 
         // Construct SerializedMessage from the raw serialized bytes field
@@ -152,10 +152,10 @@ private:
 
   void forward_IA_msg(
     const std::vector<uint8_t> & data, const std::string & type, const std::string & receiver);
-  rclcpp::Publisher<as2_ca_msgs::msg::LocalGenericMessage>::SharedPtr forwarder_pub_;
+  rclcpp::Publisher<ca_msgs::msg::LocalGenericMessage>::SharedPtr forwarder_pub_;
 };
 
 
-}  // namespace as2_ca
+}  // namespace ca_structure
 
 #endif

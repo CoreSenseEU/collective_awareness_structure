@@ -32,11 +32,11 @@
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "as2_ca/ca_gateway_afferent.hpp"
+#include "ca_structure/ca_gateway_afferent.hpp"
 
 #include <string>
 
-namespace as2_ca
+namespace ca_structure
 {
 
 CA_GatewayAfferent::CA_GatewayAfferent(rclcpp_lifecycle::LifecycleNode::SharedPtr parent)
@@ -48,7 +48,7 @@ bool CA_GatewayAfferent::configure()
 {
   std::string inter_agent_topic;
   parent_->get_parameter("inter_agent_topic", inter_agent_topic);
-  return create_subscriber(inter_agent_topic, "as2_ca_msgs/msg/InterAgentMessage");
+  return create_subscriber(inter_agent_topic, "ca_msgs/msg/InterAgentMessage");
 }
 
-}  // namespace as2_ca
+}  // namespace ca_structure

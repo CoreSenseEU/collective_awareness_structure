@@ -32,11 +32,11 @@
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "as2_ca/ca_gateway_efferent.hpp"
+#include "ca_structure/ca_gateway_efferent.hpp"
 
 #include <string>
 
-namespace as2_ca
+namespace ca_structure
 {
 
 CA_GatewayEfferent::CA_GatewayEfferent(rclcpp_lifecycle::LifecycleNode::SharedPtr parent)
@@ -61,7 +61,7 @@ size_t CA_GatewayEfferent::add_type_publisher(const std::string & type)
   }
 
   std::string topic = type + "_in";
-  create_publisher(topic, "as2_ca_msgs/msg/LocalGenericMessage");
+  create_publisher(topic, "ca_msgs/msg/LocalGenericMessage");
   size_t idx = pubs_.size() - 1;
   type_to_index_[type] = idx;
 
@@ -88,4 +88,4 @@ std::string CA_GatewayEfferent::get_topic_for_index(size_t idx) const
   return pubs_[idx]->get_topic_name();
 }
 
-}  // namespace as2_ca
+}  // namespace ca_structure

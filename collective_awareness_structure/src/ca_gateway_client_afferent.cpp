@@ -32,7 +32,7 @@
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "as2_ca/ca_gateway_client_afferent.hpp"
+#include "ca_structure/ca_gateway_client_afferent.hpp"
 
 #include <chrono>
 #include <memory>
@@ -41,7 +41,7 @@
 #include "rclcpp/executors/single_threaded_executor.hpp"
 #include "yaml-cpp/yaml.h"
 
-namespace as2_ca
+namespace ca_structure
 {
 
 CA_GatewayClientAfferent::CA_GatewayClientAfferent(
@@ -56,7 +56,7 @@ CA_GatewayClientAfferent::CA_GatewayClientAfferent(
   const std::string service_name =
     std::string(parent_->get_namespace()) + "/register_module";
 
-  register_module_client_ = parent_->create_client<as2_ca_msgs::srv::RegisterModule>(
+  register_module_client_ = parent_->create_client<ca_msgs::srv::RegisterModule>(
     service_name, rmw_qos_profile_services_default, callback_group_);
 }
 
@@ -118,7 +118,7 @@ bool CA_GatewayClientAfferent::configure()
     const std::string type = entry["type"].as<std::string>();
     const std::string module_name = entry["module_name"].as<std::string>();
 
-    auto request = std::make_shared<as2_ca_msgs::srv::RegisterModule::Request>();
+    auto request = std::make_shared<ca_msgs::srv::RegisterModule::Request>();
     request->type = type;
     request->module_name = module_name;
 
@@ -148,7 +148,7 @@ bool CA_GatewayClientAfferent::configure()
       "Module '%s' registered for type '%s', subscribing to '%s'",
       module_name.c_str(), type.c_str(), response->topic.c_str());
 
-    if (create_subscriber(response->topic, "as2_ca_msgs/msg/LocalGenericMessage")) {
+    if (create_subscriber(response->topic, "ca_msgs/msg/LocalGenericMessage")) {
       any_registered = true;
     }
   }
@@ -163,4 +163,4 @@ bool CA_GatewayClientAfferent::configure()
   return any_registered;
 }
 
-}  // namespace as2_ca
+}  // namespace ca_structure

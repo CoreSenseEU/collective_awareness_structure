@@ -40,24 +40,31 @@
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
 #include "rclcpp/executor.hpp"
+#include "lifecycle_msgs/msg/transition.hpp"
 
-#include "as2_ca/ca_gateway.hpp"
+#include "ca_structure/ca_gateway.hpp"
 
 
 class CA_GatewayTest : public ::testing::Test
 {
 protected:
   CA_GatewayTest()
-  : node_(std::make_shared<as2_ca::CA_Gateway>()), executor_(),
+  : node_(std::make_shared<ca_structure::CA_Gateway>()), executor_(),
     test_node_(std::make_shared<rclcpp::Node>("test_node"))
   {
-    executor_.add_node(node_);
+    // CA_Gateway is a CognitiveModule (LifecycleNode): use get_node_base_interface()
+    executor_.add_node(node_->get_node_base_interface());
     executor_.add_node(test_node_);
+
+    // Drive the node through its lifecycle so the service and subscriptions are active
+    node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+    node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
+
     received = false;
     test_data_ = "test_data";
   }
 
-  std::shared_ptr<as2_ca::CA_Gateway> node_;
+  std::shared_ptr<ca_structure::CA_Gateway> node_;
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::shared_ptr<rclcpp::Node> test_node_;
 
@@ -69,16 +76,16 @@ protected:
 TEST_F(CA_GatewayTest, RegisterModuleService)
 {
   // Test that the service is available
-  auto client = test_node_->create_client<as2_ca_msgs::srv::RegisterModule>("/register_module");
+  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>("/register_module");
   EXPECT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
 
-  as2_ca_msgs::srv::RegisterModule::Request request;
+  ca_msgs::srv::RegisterModule::Request request;
   request.type = "test_type";
   request.module_name = "test_module";
   auto future =
     client->async_send_request(
     std::make_shared<
-      as2_ca_msgs::srv::RegisterModule::Request>(request));
+      ca_msgs::srv::RegisterModule::Request>(request));
   // Spin until the response is received
   while (rclcpp::ok()) {
     executor_.spin_some();
@@ -96,15 +103,15 @@ TEST_F(CA_GatewayTest, RegisterModuleService)
 TEST_F(CA_GatewayTest, CorrectForwarding)
 {
   // Test that the service is available
-  auto client = test_node_->create_client<as2_ca_msgs::srv::RegisterModule>("/register_module");
+  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>("/register_module");
   EXPECT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
 
-  as2_ca_msgs::srv::RegisterModule::Request request;
+  ca_msgs::srv::RegisterModule::Request request;
   request.type = "test_type";
   request.module_name = "test_module";
   auto future =
     client->async_send_request(
-    std::make_shared<as2_ca_msgs::srv::RegisterModule::Request>(request)
+    std::make_shared<ca_msgs::srv::RegisterModule::Request>(request)
     );
 
   // Spin until the response is received
@@ -122,9 +129,9 @@ TEST_F(CA_GatewayTest, CorrectForwarding)
 
   // Create subscriber to the local topic
   std::string local_topic = response->topic;
-  auto subscription = test_node_->create_subscription<as2_ca_msgs::msg::LocalGenericMessage>(
+  auto subscription = test_node_->create_subscription<ca_msgs::msg::LocalGenericMessage>(
     local_topic, rclcpp::QoS(10),
-    [this](const as2_ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
+    [this](const ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
       EXPECT_EQ(msg->type, "test_type");
       EXPECT_EQ(
         msg->data,
@@ -136,12 +143,12 @@ TEST_F(CA_GatewayTest, CorrectForwarding)
   executor_.add_node(test_node2);
 
   // Create a publisher to the inter-agent topic
-  auto publisher = test_node2->create_publisher<as2_ca_msgs::msg::InterAgentMessage>(
+  auto publisher = test_node2->create_publisher<ca_msgs::msg::InterAgentMessage>(
     "/agent_to_agent", rclcpp::QoS(
       10));
 
   // Create a message to inter_agent topic
-  as2_ca_msgs::msg::InterAgentMessage msg;
+  ca_msgs::msg::InterAgentMessage msg;
   msg.sender = "test_sender";
   msg.receiver = "test_receiver";
   msg.type = "test_type";

@@ -27,57 +27,44 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_coupling.cpp
- *  \brief      CA_GatewayCoupling component implementation
+ *  \file       ca_gateway_efferent.hpp
+ *  \brief      CA_GatewayEfferent component header
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "ca_structure/ca_gateway_coupling.hpp"
+#ifndef AS2_CA__CA_GATEWAY_EFFERENT_HPP_
+#define AS2_CA__CA_GATEWAY_EFFERENT_HPP_
 
-#include <memory>
 #include <string>
+#include <unordered_map>
 
-using std::placeholders::_1;
-using std::placeholders::_2;
+#include "cs4home_core/Efferent.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace ca_structure
 {
 
-CA_GatewayCoupling::CA_GatewayCoupling(
-  rclcpp_lifecycle::LifecycleNode::SharedPtr parent,
-  CA_GatewayEfferent::SharedPtr efferent)
-: Coupling("ca_gateway_coupling", parent),
-  efferent_(efferent)
+class CA_GatewayEfferent : public cs4home_core::Efferent
 {
-}
+public:
+  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayEfferent)
 
-bool CA_GatewayCoupling::configure()
-{
-  std::string service_name;
-  parent_->get_parameter("register_module_service_name", service_name);
+  explicit CA_GatewayEfferent(rclcpp_lifecycle::LifecycleNode::SharedPtr parent);
 
-  register_module_srv_ = parent_->create_service<ca_msgs::srv::RegisterModule>(
-    service_name,
-    std::bind(&CA_GatewayCoupling::register_module_cb, this, _1, _2));
+  bool configure() override;
 
-  RCLCPP_INFO(
-    parent_->get_logger(),
-    "[CA_GatewayCoupling] register_module service ready on '%s'", service_name.c_str());
+  // Creates a publisher for the given type on topic "<type>_in" if not already present.
+  // Returns the publisher index for use with publish().
+  size_t add_type_publisher(const std::string & type);
 
-  return true;
-}
+  bool has_type(const std::string & type) const;
+  size_t get_index_for_type(const std::string & type) const;
+  std::string get_topic_for_index(size_t idx) const;
 
-void CA_GatewayCoupling::register_module_cb(
-  const std::shared_ptr<ca_msgs::srv::RegisterModule::Request> request,
-  std::shared_ptr<ca_msgs::srv::RegisterModule::Response> response)
-{
-  RCLCPP_INFO(
-    parent_->get_logger(),
-    "[CA_GatewayCoupling] Registration request from module '%s' for type '%s'",
-    request->module_name.c_str(), request->type.c_str());
-
-  size_t idx = efferent_->add_type_publisher(request->type);
-  response->topic = efferent_->get_topic_for_index(idx);
-}
+private:
+  std::unordered_map<std::string, size_t> type_to_index_;
+};
 
 }  // namespace ca_structure
+
+#endif  // AS2_CA__CA_GATEWAY_EFFERENT_HPP_

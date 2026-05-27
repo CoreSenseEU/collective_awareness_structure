@@ -32,14 +32,14 @@
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "as2_ca/ca_gateway_client.hpp"
+#include "ca_structure/ca_gateway_client.hpp"
 #include <string>
 #include <memory>
 #include <vector>
 
 using std::placeholders::_1;
 
-namespace as2_ca
+namespace ca_structure
 {
 CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
 {
@@ -51,7 +51,7 @@ CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
   std::string register_module_service = agent_id_ + "/register_module";
   std::string forward_generic_topic = agent_id_ + "/gateway_out";
   // Create a client for the module registration service
-  register_module_client_ = parent_->create_client<as2_ca_msgs::srv::RegisterModule>(
+  register_module_client_ = parent_->create_client<ca_msgs::srv::RegisterModule>(
     register_module_service);
 
   // Wait for the service to be available
@@ -65,14 +65,14 @@ CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
 
   RCLCPP_INFO(parent->get_logger(), "Connected to register_module service");
 
-  forwarder_pub_ = parent_->create_publisher<as2_ca_msgs::msg::LocalGenericMessage>(
+  forwarder_pub_ = parent_->create_publisher<ca_msgs::msg::LocalGenericMessage>(
     forward_generic_topic, 10);
 }
 
 void CAGatewayClient::forward_IA_msg(
   const std::vector<uint8_t> & data, const std::string & type, const std::string & receiver)
 {
-  as2_ca_msgs::msg::LocalGenericMessage generic_msg;
+  ca_msgs::msg::LocalGenericMessage generic_msg;
   generic_msg.agent = receiver;
   generic_msg.type = type;
   generic_msg.data = data;
@@ -94,4 +94,4 @@ CAGatewayClient::~CAGatewayClient()
   clear();
 }
 
-}  // namespace as2_ca
+}  // namespace ca_structure

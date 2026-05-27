@@ -33,12 +33,16 @@
  ********************************************************************************************/
 
 #include <rclcpp/rclcpp.hpp>
-#include "as2_ca/ca_gateway.hpp"
+#include "lifecycle_msgs/msg/transition.hpp"
+#include "ca_structure/ca_gateway.hpp"
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<as2_ca::CA_Gateway>());
+  auto node = std::make_shared<ca_structure::CA_Gateway>();
+  node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+  node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
+  rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
   return 0;
 }

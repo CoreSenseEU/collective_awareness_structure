@@ -30,6 +30,10 @@ include_directories(
 
 add_library(${PROJECT_NAME} SHARED
   src/ca_gateway.cpp
+  src/ca_gateway_core.cpp
+  src/ca_gateway_afferent.cpp
+  src/ca_gateway_efferent.cpp
+  src/ca_gateway_coupling.cpp
   src/ca_gateway_client.cpp
   src/ca_gateway_client_afferent.cpp
 )
