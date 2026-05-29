@@ -27,60 +27,51 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /**
-* @file as2__gtest.cpp
+* @file ca_client_gtest.cpp
 *
-* A collective awareness structure gtest
+* CA Gateway client unit tests
 *
 * @authors Guillermo GP-Lenza
 */
 
 #include <gtest/gtest.h>
 #include <thread>
-#include <optional>
 #include <memory>
 #include <string>
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
 #include "std_msgs/msg/string.hpp"
 #include "rclcpp/executor.hpp"
-#include "lifecycle_msgs/msg/transition.hpp"
 
-#include "ca_structure/ca_gateway.hpp"
-#include "ca_structure/ca_gateway_client.hpp"
+#include "ca_gateway/ca_gateway.hpp"
+#include "ca_gateway/ca_gateway_client.hpp"
 
 class CA_Gateway_ClientTest : public ::testing::Test
 {
 protected:
   CA_Gateway_ClientTest()
   : executor_(), executor_gateway_(),
-    gateway_node_(std::make_shared<ca_structure::CA_Gateway>()),
+    gateway_node_(
+      std::make_shared<ca_gateway::CA_Gateway>(
+        rclcpp::NodeOptions().arguments({"--ros-args", "--remap", "__ns:=/drone0"}))),
     publisher_node(std::make_shared<rclcpp::Node>("test_publisher_node")),
-    listener_node(std::make_shared<rclcpp::Node>("test_listener_node"))
+    listener_node(std::make_shared<rclcpp::Node>("test_listener_node", "drone0")),
+    client_(listener_node.get())
   {
-    // CA_Gateway is a CognitiveModule (LifecycleNode): use get_node_base_interface()
-    executor_gateway_.add_node(gateway_node_->get_node_base_interface());
+    executor_gateway_.add_node(gateway_node_);
     executor_.add_node(publisher_node);
     executor_.add_node(listener_node);
-
-    // Configure and activate the gateway synchronously so its service is available
-    // before CAGatewayClient tries to connect to it
-    gateway_node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-    gateway_node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     test_data_ = "test_data";
     test_topic_ = "test_topic";
     test_type_ = "test_type";
 
     local_publisher_ =
-      publisher_node->template create_publisher<ca_msgs::msg::InterAgentMessage>(
-      "/agent_to_agent", rclcpp::QoS(10));
+      publisher_node->create_publisher<ca_msgs::msg::InterAgentMessage>(
+      "/drone0/gateway_in", rclcpp::QoS(10));
 
-    register_client_ = listener_node->template create_client<ca_msgs::srv::RegisterModule>(
-      "/register_module");
-
-    // CAGatewayClient blocks waiting for the register_module service; construct it
-    // only after the gateway has been configured (service is now registered)
-    client_.emplace(listener_node);
+    register_client_ = listener_node->create_client<ca_msgs::srv::RegisterModule>(
+      "/drone0/register_module");
 
     received_ = false;
 
@@ -89,23 +80,18 @@ protected:
   }
 
   rclcpp::executors::MultiThreadedExecutor executor_;
-
   rclcpp::executors::MultiThreadedExecutor executor_gateway_;
 
-  // CA Gateway node receiving inter agent messages
-  std::shared_ptr<ca_structure::CA_Gateway> gateway_node_;
+  std::shared_ptr<ca_gateway::CA_Gateway> gateway_node_;
 
-  // Publisher for inter agent messages
   rclcpp::Node::SharedPtr publisher_node;
-  // Local module node that registers with the CA Gateway and receives forwarded messages
   rclcpp::Node::SharedPtr listener_node;
 
   rclcpp::Publisher<ca_msgs::msg::InterAgentMessage>::SharedPtr local_publisher_;
 
-  std::optional<ca_structure::CAGatewayClient> client_;
+  ca_gateway::CAGatewayClient client_;
   rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedPtr register_client_;
 
-  // Test data
   std::string test_data_;
   std::string test_topic_;
   std::string test_type_;
@@ -115,13 +101,12 @@ protected:
 
 TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
 {
-  // Spin the gateway executor in a separate thread to process incoming registration and messages
+  // Spin the gateway executor in a separate thread
   std::thread gateway_thread([this]() {executor_gateway_.spin();});
-
   std::thread client_thread([this]() {executor_.spin();});
 
   // Register local module in gateway using the GatewayClient
-  client_->register_module<std_msgs::msg::String>(
+  client_.register_module<std_msgs::msg::String>(
     test_type_, "test_module",
     [&](const std_msgs::msg::String & msg, const std::string & agent_id) {
       RCLCPP_INFO(
@@ -132,7 +117,7 @@ TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
       EXPECT_EQ(msg.data, "test_data");
     });
 
-  while (client_->get_subscriber_count() == 0) {
+  while (client_.get_subscriber_count() == 0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
@@ -146,7 +131,6 @@ TEST_F(CA_Gateway_ClientTest, CA_Gateway_ClientTest)
   // Publish a message to the InterAgent topic with the correct type and data
   ca_msgs::msg::InterAgentMessage msg;
   msg.sender = "test_sender";
-  msg.receiver = "test_receiver";
   msg.type = test_type_;
   msg.data = std::vector<uint8_t>(
     serialized.get_rcl_serialized_message().buffer,

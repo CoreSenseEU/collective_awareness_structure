@@ -1,16 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
-project(ca_structure)
+project(ca_gateway)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set( DEPENDENCIES
+set(DEPENDENCIES
   ca_msgs
   rclcpp
-  rclcpp_lifecycle
-  lifecycle_msgs
-  cs4home_core
 )
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -20,25 +17,13 @@ foreach(pkg ${DEPENDENCIES})
   find_package(${pkg} REQUIRED)
 endforeach()
 
-find_package(yaml-cpp REQUIRED)
-
-
 include_directories(
   include
   include/${PROJECT_NAME}
 )
 
-add_library(${PROJECT_NAME} SHARED
-  src/ca_gateway.cpp
-  src/ca_gateway_core.cpp
-  src/ca_gateway_afferent.cpp
-  src/ca_gateway_efferent.cpp
-  src/ca_gateway_coupling.cpp
-  src/ca_gateway_client.cpp
-  src/ca_gateway_client_afferent.cpp
-)
+add_library(${PROJECT_NAME} SHARED src/ca_gateway.cpp src/ca_gateway_client.cpp)
 ament_target_dependencies(${PROJECT_NAME} ${DEPENDENCIES})
-target_link_libraries(${PROJECT_NAME} yaml-cpp)
 
 add_executable(ca_gateway_node src/ca_gateway_node.cpp)
 target_link_libraries(ca_gateway_node ${PROJECT_NAME})
@@ -54,16 +39,16 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY config/
-  DESTINATION share/${PROJECT_NAME}/config
-)
-
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${DEPENDENCIES})
 
 install(TARGETS ca_gateway_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

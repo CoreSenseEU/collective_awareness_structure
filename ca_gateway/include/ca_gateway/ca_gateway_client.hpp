@@ -28,12 +28,12 @@
 
 /*!*******************************************************************************************
  *  \file       ca_gateway_client.hpp
- *  \brief      Ca_gateway_client node header file
+ *  \brief      CA Gateway client header file
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#ifndef AS2_CA__CA_GATEWAY_CLIENT_HPP_
-#define AS2_CA__CA_GATEWAY_CLIENT_HPP_
+#ifndef CA_GATEWAY__CA_GATEWAY_CLIENT_HPP_
+#define CA_GATEWAY__CA_GATEWAY_CLIENT_HPP_
 
 #include <functional>
 #include <memory>
@@ -52,12 +52,13 @@
 
 using std::placeholders::_1;
 
-namespace ca_structure
+namespace ca_gateway
 {
 class CAGatewayClient
 {
 public:
-  explicit CAGatewayClient(std::shared_ptr<rclcpp::Node> parent);
+  CAGatewayClient() = default;
+  explicit CAGatewayClient(rclcpp::Node * parent);
   ~CAGatewayClient();
 
   void clear();
@@ -70,7 +71,6 @@ public:
   {
     auto logger = parent_->get_logger();
     try {
-      // Create a request for the register_module service
       auto request_msg = std::make_shared<ca_msgs::srv::RegisterModule::Request>();
       request_msg->type = type;
       request_msg->module_name = module_name;
@@ -79,22 +79,16 @@ public:
         logger, "Registering module: %s with type: %s", module_name.c_str(),
         type.c_str());
 
-      // Add these before the async_send_request call
-      RCLCPP_INFO(logger, "Client pointer: %p", (void *)register_module_client_.get());
-      assert(register_module_client_ != nullptr);
-      RCLCPP_INFO(logger, "About to send request...");
-
-
-      // Call the service asynchronously
-      auto future_result = register_module_client_->async_send_request(request_msg);
-
       register_module_client_->async_send_request(
         request_msg,
         [this, module_name, callback](
           rclcpp::Client<ca_msgs::srv::RegisterModule>::SharedFuture future)
         {
+          RCLCPP_INFO(
+            parent_->get_logger(), "Received response for module registration: %s",
+            module_name.c_str());
           auto response = future.get();
-          if (response->topic == "") {
+          if (response->topic.empty()) {
             RCLCPP_ERROR(
               parent_->get_logger(), "Failed to register module: %s",
               module_name.c_str());
@@ -104,6 +98,9 @@ public:
             parent_->get_logger(), "Module registered successfully: %s, topic: %s",
             module_name.c_str(), response->topic.c_str());
           subscribe_to_local_generic<T>(response->topic, callback);
+          RCLCPP_INFO(
+            parent_->get_logger(), "Subscribed to local topic: %s for module: %s",
+            response->topic.c_str(), module_name.c_str());
         });
     } catch (const std::exception & e) {
       RCLCPP_ERROR(logger, "Exception in register_module handler: %s", e.what());
@@ -114,8 +111,25 @@ public:
 
   int get_subscriber_count();
 
+  std::vector<std::string> get_known_peers();
+
+  template<typename T>
+  void forward_IA_msg(
+    const T & msg, const std::string & type, const std::vector<std::string> & receivers)
+  {
+    rclcpp::Serialization<T> serializer;
+    rclcpp::SerializedMessage serialized_msg;
+    serializer.serialize_message(&msg, &serialized_msg);
+
+    ca_msgs::msg::LocalGenericMessage generic_msg;
+    generic_msg.agents = receivers;
+    generic_msg.type = type;
+    const auto & rcl_msg = serialized_msg.get_rcl_serialized_message();
+    generic_msg.data.assign(rcl_msg.buffer, rcl_msg.buffer + rcl_msg.buffer_length);
+    forwarder_pub_->publish(generic_msg);
+  }
+
 private:
-  // Subscriber for local_generic messages
   std::vector<rclcpp::Subscription<ca_msgs::msg::LocalGenericMessage>::SharedPtr>
   local_generic_subscribers_;
 
@@ -128,13 +142,11 @@ private:
     const std::string & generic_topic_name, std::function<void(const T &,
     const std::string &)> callback)
   {
-    // Create a subscription to the local generic topic
     auto subscription = parent_->create_subscription<ca_msgs::msg::LocalGenericMessage>(
       generic_topic_name, 10, [callback](
         const ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
         T deserialized_msg;
 
-        // Construct SerializedMessage from the raw serialized bytes field
         rclcpp::SerializedMessage serialized_msg(msg->data.size());
         auto & rcl_msg = serialized_msg.get_rcl_serialized_message();
         std::memcpy(rcl_msg.buffer, msg->data.data(), msg->data.size());
@@ -142,20 +154,15 @@ private:
 
         rclcpp::Serialization<T> serializer;
         serializer.deserialize_message(&serialized_msg, &deserialized_msg);
-        callback(deserialized_msg, msg->agent);
+        callback(deserialized_msg, msg->agents[0]);
       });
 
-    // Store the subscription to keep it alive
     local_generic_subscribers_.push_back(subscription);
   }
-  std::shared_ptr<rclcpp::Node> parent_;
+  rclcpp::Node * parent_;
 
-  void forward_IA_msg(
-    const std::vector<uint8_t> & data, const std::string & type, const std::string & receiver);
   rclcpp::Publisher<ca_msgs::msg::LocalGenericMessage>::SharedPtr forwarder_pub_;
 };
 
-
-}  // namespace ca_structure
-
-#endif
+}  // namespace ca_gateway
+#endif  // CA_GATEWAY__CA_GATEWAY_CLIENT_HPP_

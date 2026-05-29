@@ -27,44 +27,41 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /**
-* @file as2__gtest.cpp
+* @file ca_gtest.cpp
 *
-* A collective awareness structure gtest
+* CA Gateway unit tests
 *
 * @authors Guillermo GP-Lenza
 */
 
 #include <gtest/gtest.h>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
 #include "rclcpp/executor.hpp"
-#include "lifecycle_msgs/msg/transition.hpp"
 
-#include "ca_structure/ca_gateway.hpp"
+#include "ca_gateway/ca_gateway.hpp"
 
 
 class CA_GatewayTest : public ::testing::Test
 {
 protected:
   CA_GatewayTest()
-  : node_(std::make_shared<ca_structure::CA_Gateway>()), executor_(),
-    test_node_(std::make_shared<rclcpp::Node>("test_node"))
+  : node_(
+      std::make_shared<ca_gateway::CA_Gateway>(
+        rclcpp::NodeOptions().arguments({"--ros-args", "--remap", "__ns:=/drone0"}))),
+    executor_(),
+    test_node_(std::make_shared<rclcpp::Node>("test_node", "drone0"))
   {
-    // CA_Gateway is a CognitiveModule (LifecycleNode): use get_node_base_interface()
-    executor_.add_node(node_->get_node_base_interface());
+    executor_.add_node(node_);
     executor_.add_node(test_node_);
-
-    // Drive the node through its lifecycle so the service and subscriptions are active
-    node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-    node_->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
-
     received = false;
     test_data_ = "test_data";
   }
 
-  std::shared_ptr<ca_structure::CA_Gateway> node_;
+  std::shared_ptr<ca_gateway::CA_Gateway> node_;
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::shared_ptr<rclcpp::Node> test_node_;
 
@@ -76,7 +73,8 @@ protected:
 TEST_F(CA_GatewayTest, RegisterModuleService)
 {
   // Test that the service is available
-  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>("/register_module");
+  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>(
+    "/drone0/register_module");
   EXPECT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
 
   ca_msgs::srv::RegisterModule::Request request;
@@ -94,7 +92,6 @@ TEST_F(CA_GatewayTest, RegisterModuleService)
     }
   }
 
-  // Wait for response
   auto response = future.get();
   EXPECT_FALSE(response->topic.empty());
   EXPECT_TRUE(response->topic.find("test_type_in") != std::string::npos);
@@ -102,8 +99,8 @@ TEST_F(CA_GatewayTest, RegisterModuleService)
 
 TEST_F(CA_GatewayTest, CorrectForwarding)
 {
-  // Test that the service is available
-  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>("/register_module");
+  auto client = test_node_->create_client<ca_msgs::srv::RegisterModule>(
+    "/drone0/register_module");
   EXPECT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
 
   ca_msgs::srv::RegisterModule::Request request;
@@ -122,7 +119,6 @@ TEST_F(CA_GatewayTest, CorrectForwarding)
     }
   }
 
-  // Wait for response
   auto response = future.get();
   EXPECT_FALSE(response->topic.empty());
   EXPECT_TRUE(response->topic.find("test_type_in") != std::string::npos);
@@ -131,7 +127,10 @@ TEST_F(CA_GatewayTest, CorrectForwarding)
   std::string local_topic = response->topic;
   auto subscription = test_node_->create_subscription<ca_msgs::msg::LocalGenericMessage>(
     local_topic, rclcpp::QoS(10),
-    [this](const ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
+    [this](
+      const ca_msgs::msg::LocalGenericMessage::SharedPtr msg) {
+      std::cout << "Received message on local topic: " << msg->agents[0] <<
+        ", " << msg->type << std::endl;
       EXPECT_EQ(msg->type, "test_type");
       EXPECT_EQ(
         msg->data,
@@ -144,13 +143,12 @@ TEST_F(CA_GatewayTest, CorrectForwarding)
 
   // Create a publisher to the inter-agent topic
   auto publisher = test_node2->create_publisher<ca_msgs::msg::InterAgentMessage>(
-    "/agent_to_agent", rclcpp::QoS(
+    "/drone0/gateway_in", rclcpp::QoS(
       10));
 
   // Create a message to inter_agent topic
   ca_msgs::msg::InterAgentMessage msg;
   msg.sender = "test_sender";
-  msg.receiver = "test_receiver";
   msg.type = "test_type";
   msg.data = std::vector<uint8_t>(test_data_.begin(), test_data_.end());
 

@@ -27,34 +27,32 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_client.hpp
- *  \brief      Ca_gateway_client implementation file
+ *  \file       ca_gateway_client.cpp
+ *  \brief      CA Gateway client implementation
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#include "ca_structure/ca_gateway_client.hpp"
+#include "ca_gateway/ca_gateway_client.hpp"
 #include <string>
 #include <memory>
 #include <vector>
 
 using std::placeholders::_1;
 
-namespace ca_structure
+namespace ca_gateway
 {
-CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
+CAGatewayClient::CAGatewayClient(rclcpp::Node * parent)
 {
   parent_ = parent;
 
   agent_id_ = parent_->get_namespace();
 
-  // Add node namespace and register module
   std::string register_module_service = agent_id_ + "/register_module";
   std::string forward_generic_topic = agent_id_ + "/gateway_out";
-  // Create a client for the module registration service
+
   register_module_client_ = parent_->create_client<ca_msgs::srv::RegisterModule>(
     register_module_service);
 
-  // Wait for the service to be available
   while (!register_module_client_->wait_for_service(std::chrono::seconds(1))) {
     if (!rclcpp::ok()) {
       RCLCPP_ERROR(parent->get_logger(), "Interrupted while waiting for the service. Exiting.");
@@ -69,19 +67,39 @@ CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
     forward_generic_topic, 10);
 }
 
-void CAGatewayClient::forward_IA_msg(
-  const std::vector<uint8_t> & data, const std::string & type, const std::string & receiver)
-{
-  ca_msgs::msg::LocalGenericMessage generic_msg;
-  generic_msg.agent = receiver;
-  generic_msg.type = type;
-  generic_msg.data = data;
-  forwarder_pub_->publish(generic_msg);
-}
 
 int CAGatewayClient::get_subscriber_count()
 {
   return local_generic_subscribers_.size();
+}
+
+std::vector<std::string> CAGatewayClient::get_known_peers()
+{
+  std::vector<std::string> peers;
+
+  auto node_names = parent_->get_node_names();
+
+  for (const auto & node_name : node_names) {
+    std::string namespace_str = node_name;
+    size_t last_slash = node_name.find_last_of('/');
+    if (last_slash != std::string::npos && last_slash > 0) {
+      namespace_str = node_name.substr(0, last_slash);
+    }
+
+    if (!namespace_str.empty() && namespace_str.front() == '/') {
+      namespace_str = namespace_str.substr(1);
+    }
+
+    std::string own_id = agent_id_;
+    if (!own_id.empty() && own_id.front() == '/') {own_id = own_id.substr(1);}
+    if (!namespace_str.empty() && namespace_str != own_id) {
+      if (std::find(peers.begin(), peers.end(), namespace_str) == peers.end()) {
+        peers.push_back(namespace_str);
+      }
+    }
+  }
+
+  return peers;
 }
 
 void CAGatewayClient::clear()
@@ -94,4 +112,4 @@ CAGatewayClient::~CAGatewayClient()
   clear();
 }
 
-}  // namespace ca_structure
+}  // namespace ca_gateway

@@ -27,38 +27,18 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_core.hpp
- *  \brief      CA_GatewayCore component header
+ *  \file       ca_gateway_node.cpp
+ *  \brief      CA Gateway node executable
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
-#ifndef AS2_CA__CA_GATEWAY_CORE_HPP_
-#define AS2_CA__CA_GATEWAY_CORE_HPP_
+#include <rclcpp/rclcpp.hpp>
+#include "ca_gateway/ca_gateway.hpp"
 
-#include <memory>
-
-#include "cs4home_core/Core.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_lifecycle/lifecycle_node.hpp"
-
-namespace ca_structure
+int main(int argc, char ** argv)
 {
-
-class CA_GatewayCore : public cs4home_core::Core
-{
-public:
-  RCLCPP_SMART_PTR_DEFINITIONS(CA_GatewayCore)
-
-  explicit CA_GatewayCore(rclcpp_lifecycle::LifecycleNode::SharedPtr parent);
-
-  bool configure() override;
-  bool activate() override;
-  bool deactivate() override;
-
-private:
-  void ia_message_callback(std::shared_ptr<rclcpp::SerializedMessage> msg);
-};
-
-}  // namespace ca_structure
-
-#endif  // AS2_CA__CA_GATEWAY_CORE_HPP_
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<ca_gateway::CA_Gateway>());
+  rclcpp::shutdown();
+  return 0;
+}

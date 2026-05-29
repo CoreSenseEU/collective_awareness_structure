@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//root/cs_test_ws/**)",
+      "Bash(colcon build *)"
+    ]
+  }
+}
