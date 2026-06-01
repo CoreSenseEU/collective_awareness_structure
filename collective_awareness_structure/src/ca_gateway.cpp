@@ -53,8 +53,8 @@ CA_Gateway::CallbackReturnT CA_Gateway::on_configure(const rclcpp_lifecycle::Sta
 
   // Declare CA Gateway-specific parameters
   declare_parameter("inter_agent_topic", "/agent_to_agent");
-  declare_parameter("register_module_service_name", "/register_module");
-  declare_parameter("out_messages_topic", "/gateway_out");
+  declare_parameter("register_module_service_name", "register_module");
+  declare_parameter("out_messages_topic", "gateway_out");
   declare_parameter("agent_id", "");
 
   inter_agent_topic_ = get_parameter("inter_agent_topic").as_string();
@@ -81,8 +81,11 @@ CA_Gateway::CallbackReturnT CA_Gateway::on_configure(const rclcpp_lifecycle::Sta
   core_->configure();   // registers ia_message_callback on the afferent
 
   // --- Coupling: exposes the register_module service ---
-  coupling_ = std::make_shared<CA_GatewayCoupling>(self, gw_efferent);
-  coupling_->configure();
+  // Note: cs4home_core::Coupling::configure() is not virtual, so we keep a
+  // typed pointer and call configure() on it directly.
+  auto gw_coupling = std::make_shared<CA_GatewayCoupling>(self, gw_efferent);
+  coupling_ = gw_coupling;
+  gw_coupling->configure();
 
   // --- Outgoing path: local modules → inter-agent network ---
   inter_agent_pub_ = create_publisher<ca_msgs::msg::InterAgentMessage>(

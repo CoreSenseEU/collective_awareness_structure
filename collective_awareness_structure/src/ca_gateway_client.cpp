@@ -27,71 +27,58 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 /*!*******************************************************************************************
- *  \file       ca_gateway_client.hpp
- *  \brief      Ca_gateway_client implementation file
+ *  \file       ca_gateway_client.cpp
+ *  \brief      CA Gateway client implementation
  *  \authors    Guillermo GP-Lenza
  ********************************************************************************************/
 
 #include "ca_structure/ca_gateway_client.hpp"
-#include <string>
-#include <memory>
-#include <vector>
 
-using std::placeholders::_1;
+#include <algorithm>
+#include <string>
+#include <vector>
 
 namespace ca_structure
 {
-CAGatewayClient::CAGatewayClient(std::shared_ptr<rclcpp::Node> parent)
-{
-  parent_ = parent;
-
-  agent_id_ = parent_->get_namespace();
-
-  // Add node namespace and register module
-  std::string register_module_service = agent_id_ + "/register_module";
-  std::string forward_generic_topic = agent_id_ + "/gateway_out";
-  // Create a client for the module registration service
-  register_module_client_ = parent_->create_client<ca_msgs::srv::RegisterModule>(
-    register_module_service);
-
-  // Wait for the service to be available
-  while (!register_module_client_->wait_for_service(std::chrono::seconds(1))) {
-    if (!rclcpp::ok()) {
-      RCLCPP_ERROR(parent->get_logger(), "Interrupted while waiting for the service. Exiting.");
-      return;
-    }
-    RCLCPP_INFO(parent->get_logger(), "Service not available, waiting again...");
-  }
-
-  RCLCPP_INFO(parent->get_logger(), "Connected to register_module service");
-
-  forwarder_pub_ = parent_->create_publisher<ca_msgs::msg::LocalGenericMessage>(
-    forward_generic_topic, 10);
-}
-
-void CAGatewayClient::forward_IA_msg(
-  const std::vector<uint8_t> & data, const std::string & type, const std::string & receiver)
-{
-  ca_msgs::msg::LocalGenericMessage generic_msg;
-  generic_msg.agent = receiver;
-  generic_msg.type = type;
-  generic_msg.data = data;
-  forwarder_pub_->publish(generic_msg);
-}
-
-int CAGatewayClient::get_subscriber_count()
-{
-  return local_generic_subscribers_.size();
-}
-
-void CAGatewayClient::clear()
-{
-  this->local_generic_subscribers_.clear();
-}
 
 CAGatewayClient::~CAGatewayClient()
 {
   clear();
+}
+
+void CAGatewayClient::clear()
+{
+  local_generic_subscribers_.clear();
+}
+
+int CAGatewayClient::get_subscriber_count() const
+{
+  return static_cast<int>(local_generic_subscribers_.size());
+}
+
+std::vector<std::string> CAGatewayClient::get_known_peers() const
+{
+  if (!get_node_names_fn_) {
+    return {};
+  }
+  std::vector<std::string> peers;
+  for (const auto & node_name : get_node_names_fn_()) {
+    // Node names are "/namespace/node_name"; extract the namespace part.
+    const size_t last_slash = node_name.rfind('/');
+    std::string ns = (last_slash != std::string::npos && last_slash > 0) ?
+      node_name.substr(0, last_slash) : node_name;
+
+    if (!ns.empty() && ns.front() == '/') {
+      ns = ns.substr(1);
+    }
+    if (ns.empty() || ns == agent_id_) {
+      continue;
+    }
+    if (std::find(peers.begin(), peers.end(), ns) == peers.end()) {
+      peers.push_back(ns);
+    }
+  }
+  return peers;
 }
 
 }  // namespace ca_structure
